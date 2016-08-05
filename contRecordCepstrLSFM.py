@@ -13,6 +13,7 @@ import heapq
 import struct
 from matplotlib import animation
 
+print 'here''s a sample change'
 t = 0 # time iterator
 fs = 44100
 CHUNK = 8192
