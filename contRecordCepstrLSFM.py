@@ -169,8 +169,13 @@ while(1):
 		LSFM_buf[i] = LSFM_buf[i-1]
 
 # take FFT of newest frame and compute cepstrum	
-	R[0][:] = 5*np.log10(np.abs(dct(input_wave[0:fftLen])))/np.sqrt(fftLen)	
-	print type(R),len(R[0])
+	R[0][:] = 5*np.log10(np.abs(dct(input_wave[0:fftLen])))/np.sqrt(fftLen)
+	spec_sum = np.sum(R[0])
+	norm_R = (1.0/spec_sum)*R[0]
+	x = np.multiply(norm_R,np.log2(norm_R))
+	x = x[np.isfinite(x)]
+	new_measure = ((-1)*(1.0/np.log2(fftLen))*np.sum(x)) 	
+	print 'new_measure',new_measure
 	C[0][:] = np.log10(np.abs(dct(R[0][:])))/np.sqrt(882) 
 	R = np.array(R)
 	C = np.array(C)
@@ -179,23 +184,28 @@ while(1):
 	
 #	print 'rows',len(V_c),'cols',len(V_c[0])
 	# average spectral power over 10 frames
-	S = 1/float(bufSize)*np.sum(np.square(np.abs(R)),0)	
+
+	x = np.square(np.abs(np.fft.fft(input_wave[0:fftLen])))
+	AM = np.mean(x)
+	GM = gmean(x)
+	LSFM_buf[0]  = 100*np.log10(GM/float(AM))
+	print 'SFM!!!',LSFM_buf[0]	
+#	S = 1/float(bufSize)*np.sum(np.square(np.abs(R)),0)	
 #	print type(S),len(S)
 # AM over frequency bins	
-	AM = (1/float(fftLen))*np.sum(S)
+#	AM = np.mean(S)
 #	print AM	
 # GM over frequency bins	
-	GM = gmean(S)
-	print GM, geomet(S)
+#	GM = gmean(S)
 # Compute spectral flatness coefficient
-	LSFM_buf[0] = 1000*np.sum(np.log(AM/GM))	
 	max_LSFM = max(LSFM_buf)
 	min_LSFM = min(LSFM_buf)
-	threshold = (max_LSFM+min_LSFM)/2.0
+#	threshold = (max_LSFM+min_LSFM)/2.0
+	threshold = -120
 	print 'max_LSFM',max_LSFM,'min_LSFM', min_LSFM,'threshold',threshold
 	if ii<10:
 		ii+=1
-		initial_LSFM_buf.append(1000*np.sum(np.log(AM/GM)))	
+		initial_LSFM_buf.append(LSFM_buf[0])	
 	background = np.mean(initial_LSFM_buf)
 #plot LSFM vs time for 8 seconds 
 # 
@@ -221,9 +231,9 @@ while(1):
 		print funda_freq,' | ',  LSFM_buf[0]
 	if LSFM_buf[0] > threshold:
 		print 'noise'
-	elif LSFM_buf[0] <= threshold and funda_freq > 200:
+	elif LSFM_buf[0] <= threshold and funda_freq > 300:
 		print 'music'
-	elif LSFM_buf[0] <= threshold and funda_freq <= 200:
+	elif LSFM_buf[0] <= threshold and funda_freq <= 300:
 		print 'voice'
 	    #shift "frame" 1 up:
 
