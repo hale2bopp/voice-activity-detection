@@ -149,8 +149,15 @@ x=[]
 y=[]
 initial_LSFM_buf = []
 LSFM_bufSize = 10
+fundaVariance_bufsize = 20
 LSFM_buf=[0 for i in range(LSFM_bufSize)]
+fundaVariance_buf=[0 for i in range(LSFM_bufSize)]
 ii=0
+
+
+# check past 10 frames for fundamental frequency to check the variation in the measured fundamental
+# if the fundamental varies a lot, another way to tell that it's noise
+
 while(1):	
 	data = stream.read(CHUNK)
 	shorts = struct.unpack('h'*(CHUNK*2),data)
@@ -167,9 +174,12 @@ while(1):
 
 	for i in range(1,LSFM_bufSize):
 		LSFM_buf[i] = LSFM_buf[i-1]
-
+	for i in range(1,LSFM_bufSize):
+		fundaVariance_buf[i] = fundaVariance_buf[i-1]
+	
 # take FFT of newest frame and compute cepstrum	
 	R[0][:] = 5*np.log10(np.abs(dct(input_wave[0:fftLen])))/np.sqrt(fftLen)
+	
 	spec_sum = np.sum(R[0])
 	norm_R = (1.0/spec_sum)*R[0]
 	x = np.multiply(norm_R,np.log2(norm_R))
@@ -201,7 +211,7 @@ while(1):
 	max_LSFM = max(LSFM_buf)
 	min_LSFM = min(LSFM_buf)
 #	threshold = (max_LSFM+min_LSFM)/2.0
-	threshold = -120
+	threshold = -190
 	print 'max_LSFM',max_LSFM,'min_LSFM', min_LSFM,'threshold',threshold
 	if ii<10:
 		ii+=1
@@ -220,20 +230,28 @@ while(1):
 #	ii+=1
 #	if ii> RATE*8:
 #		break
-
+	centroid = np.sum(np.multiply(full_freq, x))/float(np.sum(x))
+	print 'spectral centroid', centroid
 	max_val,relmax_val= find_peaks(R,0,1,1)
 #	funda_freq = 1/float(q[max_val])
 	funda_freq = full_freq[max_val]
+	fundaVariance_buf[0] = funda_freq
+	fundaVariance = np.var(fundaVariance_buf)
+	print 'variance of past ten measures of fundamental frequency',fundaVariance
 	if funda_freq > fs/2.0:
 		funda_freq = fs-funda_freq
 		print funda_freq ,' | ',  LSFM_buf[0]
 	else:	
 		print funda_freq,' | ',  LSFM_buf[0]
-	if LSFM_buf[0] > threshold:
-		print 'noise'
-	elif LSFM_buf[0] <= threshold and funda_freq > 300:
+# 	if the LSFM_buf[0] < threshold but the variance is too high, classify it as noise
+#	if the LSFM_buf[0] > threshold and the variance is too high, classify it as noise
+#	if the LSFM_buf[0] < threshold and variance too low, check frequency and classify as music or voice
+#	if the LSfM_buf[0] > threshold but variance is low, check frequency and classify as music or voice	
+	if LSFM_buf[0]<=threshold and funda_freq > 370:
 		print 'music'
-	elif LSFM_buf[0] <= threshold and funda_freq <= 300:
+	elif LSFM_buf[0]>threshold:
+		print 'noise'
+	elif LSFM_buf[0]<=threshold and funda_freq <= 370:
 		print 'voice'
 	    #shift "frame" 1 up:
 
